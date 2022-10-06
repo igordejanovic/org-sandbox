@@ -1,0 +1,138 @@
+#+title: Org Mode API sandbox
+#+description: A sandbox with emacs lisp snippets demonstrating usage of Org Mode API
+#+author: Igor Dejanovic
+#+email: igor dot dejanovic at gmail dot com
+
+#+begin_comment
+This heading bellow is a test tree used by code blocks in [[*Code][the Code section]]
+#+end_comment
+* TODO My TODO list
+** TODO Buy some milk
+** TODO Build a tree house
+** TODO A title with prop
+:PROPERTIES:
+:MY_PROP: some value
+:END:
+*** TODO A subtitle with the same prop redefined
+:PROPERTIES:
+:MY_PROP: some other value
+:END:
+*** TODO Ignored subtitle :ignore:
+*** TODO Another subtitle with some other property
+:PROPERTIES:
+:SOME_OTHER_PROP: just some value
+:END:
+** DONE Do something else
+
+* Code
+These are code snippets using the content above. You can =C-c-c= into each of the
+code blocks to see the results. Some of the snippets change the content while
+others produce the result without side-effects.
+** Finds a position of a heading
+=org-find-exact-headline-in-buffer= - finds a point-or-marker (POM) for the given
+title.
+
+#+begin_src emacs-lisp
+(org-find-exact-headline-in-buffer "A title with prop")
+#+end_src
+
+#+RESULTS:
+: #<marker at 373 in sandbox.org>
+
+** Get a property of a title
+=org-entry-get= - returns the value of a property for the current POM.
+
+#+begin_src emacs-lisp
+(org-entry-get (org-find-exact-headline-in-buffer "A title with prop") "MY_PROP")
+#+end_src
+
+#+RESULTS:
+: some value
+
+** Get an element at point - ~org-element-at-point~
+For a given point in the buffer returns an element which is required in some API
+calls. An element is a list where first element is a type and second is a plist
+
+#+begin_src emacs-lisp
+(org-element-at-point (org-find-exact-headline-in-buffer "A title with prop"))
+#+end_src
+
+#+RESULTS:
+| headline | (:raw-value A title with prop :begin 373 :end 677 :pre-blank 0 :contents-begin 399 :contents-end 677 :robust-begin 441 :robust-end 675 :level 2 :priority nil :tags nil :todo-keyword TODO :todo-type todo :post-blank 0 :footnote-section-p nil :archivedp nil :commentedp nil :post-affiliated 373 :MY_PROP "some value" :title A title with prop :mode nil :granularity element :org-element--cache-sync-key (6588 . 373) :cached t :parent (headline (:raw-value My TODO list :begin 304 :end 704 :pre-blank 0 :contents-begin 324 :contents-end 703 :robust-begin 326 :robust-end 701 :level 1 :priority nil :tags nil :todo-keyword TODO :todo-type todo :post-blank 1 :footnote-section-p nil :archivedp nil :commentedp nil :post-affiliated 304 :title (My TODO list) :parent (org-data (:begin 1 :contents-begin 1 :contents-end 3708 :end 3708 :robust-begin 3 :robust-end 3706 :post-blank 0 :post-affiliated 1 :path /home/igor/repos/emacs/emacs-sandbox/sandbox.org :mode org-data :CATEGORY sandbox :parent nil :cached t :org-element--cache-sync-key (4375 . -1))) :cached t :org-element--cache-sync-key (5587 . 304)))) |
+
+** Get an element type - ~org-element-type~
+Returns an element type (i.e. the symbol at the first element of the element
+list).
+
+#+begin_src emacs-lisp
+(org-element-type (org-element-at-point (org-find-exact-headline-in-buffer "A title with prop")))
+#+end_src
+
+#+RESULTS:
+: headline
+
+** Get an element property - ~org-element-property~
+To get an element property use ~org-element-property~. This call is basically a
+=plist-get= in the second element of the list (see [[*Get an element at point - ~org-element-at-point~][above]]).
+
+#+begin_src emacs-lisp
+(let* ((element (org-element-at-point (org-find-exact-headline-in-buffer "A title with prop"))))
+  (cons (org-element-property :title element) (org-element-property :todo-keyword element)))
+#+end_src
+
+#+RESULTS:
+: (A title with prop . TODO)
+
+** Gets a property values up the parent chain and returns a list of values
+
+#+begin_src emacs-lisp
+(let* ((element (org-element-at-point (org-find-exact-headline-in-buffer "A subtitle with the same prop redefined")))
+       path root)
+  (while element
+    (setq path (cons (org-element-property :MY_PROP element) path))
+    (setq element (org-element-property :parent element))
+    )
+  path)
+#+end_src
+
+#+RESULTS:
+| nil | nil | some value | some other value |
+
+** The root element of an Org file is ~org-data~
+
+#+begin_src emacs-lisp
+(org-element-property :parent (org-element-at-point (org-find-exact-headline-in-buffer "My TODO list")))
+#+end_src
+
+#+RESULTS:
+| org-data | (:begin 1 :contents-begin 1 :contents-end 5759 :end 5759 :robust-begin 3 :robust-end 5757 :post-blank 0 :post-affiliated 1 :path /home/igor/repos/emacs/emacs-sandbox/sandbox.org :mode org-data :CATEGORY sandbox :parent nil :cached t :org-element--cache-sync-key (4375 . -1)) |
+
+** Find a title and change its TODO status
+Observe the change in [[*Build a tree house][the above heading]].
+#+begin_src emacs-lisp :results none
+(save-excursion
+  (goto-char (org-find-exact-headline-in-buffer "Build a tree house"))
+  (org-todo 'done)
+  )
+#+end_src
+
+- Note: =save-excursion= remembers and restores the position in the buffer after
+  the body is evaluated. Remove =save-excursion= and observe how cursor is moved
+  to the heading above.
+
+** TODO Change all title states
+- =org-map-entries= is used to map a part of the org file to other form.
+#+begin_src emacs-lisp :results none
+(let ((match "/+TODO")
+      (scope 'tree)
+      (skip nil)
+      (spacing nil))
+  (save-excursion
+    (goto-char (org-find-exact-headline-in-buffer "My TODO list"))
+    (org-map-entries
+     (lambda ()
+       (org-todo 'done))
+     match scope skip)))
+#+end_src
+- Note: =My TODO list= will not change first time as there is a protection from
+  making headlines =DONE= while still having subheadings with =TODO= state.

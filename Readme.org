@@ -1,0 +1,4 @@
+#+TITLE: A sandbox for investigating Org Mode API
+
+The =sandbox.org= file hosts code snippets which shows various idioms and
+approaches in working with Org Mode API.
